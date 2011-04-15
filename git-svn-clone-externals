@@ -16,14 +16,14 @@ function call()
 
 function do_clone()
 {
-	test -d .git_externals || return 1
+	test -d "$repobasedir" || return 1
 	module=`echo $remote_url|sed 's,\(.*\)\(/trunk\|/branch.*\|/tag.*\),\1,'`
 	branch=`echo $remote_url|sed 's,\(.*\)\(/trunk\|/branch.*\|/tag.*\),\2,'|sed 's,^/,,'`
 	if [[ $branch = $remote_url ]]; then
 		branch=""
 	fi
  	(
-		cd .git_externals
+		cd "$repobasedir"
 		if [ -d "$local_directory" ]; then
 			(
 				cd "$local_directory"
@@ -71,7 +71,7 @@ function do_excludes()
 {
 	dir="$1"
 	git_excludes_path=.git/info/exclude
-	if ! grep -q '^.git_externals$' "$git_excludes_path"
+	if [ -z "$nolink" ] && ! grep -q '^.git_externals$' "$git_excludes_path"
 	then
 		echo .git_externals >> "$git_excludes_path"
 	fi
@@ -91,10 +91,17 @@ function is_excluded()
             local result=1
         fi
     fi
-    echo $result 
+    echo $result
     return
 }
 
+
+if [ "x$1" = "x--nolink" ] ;then
+    nolink=true
+    repobasedir=$PWD
+else
+    repobasedir=.git_externals
+fi
 
 git svn show-externals|grep -vE '#|^$'|while read -a words
 do
@@ -125,12 +132,11 @@ do
         echo "$local_directory -> $remote_url"
 
         dir=`dirname $local_directory`
-        [ -d ".git_externals/$dir" ] || mkdir -p ".git_externals/$dir"
+        [ -d "$repobasedir/$dir" ] || mkdir -p "$repobasedir/$dir"
 
-        do_clone "$revision" "$remote_url" "$local_directory" || exit
-        do_link "$local_directory"
+        do_clone || exit
+        [ -z "$nolink" ] && do_link "$local_directory"
         do_excludes "$local_directory"
     fi
 
 done
-
